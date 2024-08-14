@@ -33,7 +33,7 @@ load_dotenv()
 client = ollama.AsyncClient()
 
 # Initialize the Tavily client
-tavily_api_key = "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"
+tavily_api_key = os.getenv("TAVILY_API_KEY")
 if not tavily_api_key:
     raise ValueError("TAVILY_API_KEY not found in environment variables")
 tavily = TavilyClient(api_key=tavily_api_key)
@@ -70,11 +70,11 @@ MAX_CONTEXT_TOKENS = 200000  # Reduced to 200k tokens for context window
 
 # Models
 # Models that maintain context memory across interactions
-MAINMODEL = "llama3.1"  # Maintains conversation history and file contents
+MAINMODEL = "mistral-nemo"  # Maintains conversation history and file contents
 
 # Models that don't maintain context (memory is reset after each call)
-TOOLCHECKERMODEL = "llama3.1"
-CODEEDITORMODEL = "llama3.1"
+TOOLCHECKERMODEL = "mistral-nemo"
+CODEEDITORMODEL = "mistral-nemo"
 
 # System prompts
 BASE_SYSTEM_PROMPT = """
