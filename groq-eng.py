@@ -695,147 +695,6 @@ async def send_to_ai_for_executing(code, execution_result):
         console.print(f"Error in AI code execution analysis: {str(e)}", style="bold red")
         return f"Error analyzing code execution from 'code_execution_env': {str(e)}"
 
-# async def chat_with_groq(user_input, image_path=None, current_iteration=None, max_iterations=None):
-#     global conversation_history, main_model_tokens
-
-#     current_conversation = []
-
-#     if image_path:
-#         image_base64 = encode_image_to_base64(image_path)
-#         if image_base64.startswith("Error"):
-#             console.print(Panel(f"Error encoding image: {image_base64}", title="Error", style="bold red"))
-#             return "I'm sorry, there was an error processing the image. Please try again.", False
-
-#         image_message = {
-#             "role": "user",
-#             "content": [
-#                 {
-#                     "type": "image",
-#                     "source": {
-#                         "type": "base64",
-#                         "media_type": "image/jpeg",
-#                         "data": image_base64
-#                     }
-#                 },
-#                 {
-#                     "type": "text",
-#                     "text": f"User input for image: {user_input}"
-#                 }
-#             ]
-#         }
-#         current_conversation.append(image_message)
-#     else:
-#         current_conversation.append({"role": "user", "content": user_input})
-
-#     messages = conversation_history + current_conversation
-
-#     try:
-#         system_message = {"role": "system", "content": update_system_prompt(current_iteration, max_iterations)}
-#         messages_with_system = [system_message] + messages
-
-#         console.print(Panel("Sending request to Groq API...", style="cyan"))
-#         chat_completion = groq_client.chat.completions.create(
-#             messages=messages_with_system,
-#             model=MAINMODEL,
-#             max_tokens=8000,
-#             tools=tools
-#         )
-#         console.print(Panel("Received response from Groq API", style="green"))
-
-#         if chat_completion is None or not hasattr(chat_completion, 'choices') or len(chat_completion.choices) == 0:
-#             raise ValueError("Received empty response from Groq API")
-
-#         assistant_message = chat_completion.choices[0].message
-        
-
-#         if assistant_message is None:
-#             raise ValueError("Received empty message content from Groq API")
-
-#         assistant_response = assistant_message.content
-
-#         if assistant_response is None:
-#             raise ValueError("Received empty message content from Groq API")
-
-            
-#         if hasattr(chat_completion, 'usage'):
-#             usage = chat_completion.usage
-#             main_model_tokens['input'] += getattr(usage, 'prompt_tokens', 0)
-#             main_model_tokens['output'] += getattr(usage, 'completion_tokens', 0)
-#         else:
-#             # Si no hay información de uso, hacemos una estimación basada en la longitud
-#             main_model_tokens['input'] += len(json.dumps(messages_with_system))
-#             main_model_tokens['output'] += len(assistant_response)
-
-
-#         tool_calls = getattr(assistant_message, 'tool_calls', []) or []
-    
-#         console.print(Panel(Markdown(assistant_response), title="Groq's Response", title_align="left", border_style="blue", expand=False))
-
-#         if tool_calls:
-#             console.print(Panel("Tool calls detected", title="Tool Usage", style="bold yellow"))
-#             console.print(Panel(json.dumps(tool_calls, indent=2), title="Tool Calls", style="cyan"))
-
-#         if file_contents:
-#             files_in_context = "\n".join(file_contents.keys())
-#         else:
-#             files_in_context = "No files in context. Read, create, or edit files to add."
-#         console.print(Panel(files_in_context, title="Files in Context", title_align="left", border_style="white", expand=False))
-
-#         for tool_call in tool_calls:
-#             tool_result = await execute_tool(tool_call)
-            
-#             if tool_result["is_error"]:
-#                 console.print(Panel(tool_result["content"], title="Tool Execution Error", style="bold red"))
-#             else:
-#                 console.print(Panel(tool_result["content"], title_align="left", title="Tool Result", style="green"))
-
-#             current_conversation.append({
-#                 "role": "assistant",
-#                 "content": None,
-#                 "tool_calls": [tool_call]
-#             })
-
-#             current_conversation.append({
-#                 "role": "tool",
-#                 "content": tool_result["content"],
-#                 "tool_call_id": getattr(tool_call, 'id', 'unknown_id')
-#             })
-
-#         messages = conversation_history + current_conversation
-
-#         try:
-#             tool_response = groq_client.chat.completions.create(
-#                 messages=messages,
-#                 model=TOOLCHECKERMODEL,
-#                 max_tokens=8000,
-#                 tools=tools
-#             )
-#             if hasattr(tool_response, 'usage'):
-#                 tool_checker_tokens['input'] += getattr(tool_response.usage, 'prompt_tokens', 0)
-#                 tool_checker_tokens['output'] += getattr(tool_response.usage, 'completion_tokens', 0)
-
-#             tool_checker_response = tool_response.choices[0].message.content if tool_response.choices else None
-#             if tool_checker_response:
-#                 console.print(Panel(Markdown(tool_checker_response), title="Groq's Response to Tool Result",  title_align="left", border_style="blue", expand=False))
-#                 assistant_response += "\n\n" + tool_checker_response
-#         except Exception as e:
-#             error_message = f"Error in tool response: {str(e)}"
-#             console.print(Panel(error_message, title="Error", style="bold red"))
-#             assistant_response += f"\n\n{error_message}"
-
-#     except Exception as e:
-#         console.print(Panel(f"API Error: {str(e)}", title="API Error", style="bold red"))
-#         return "I'm sorry, there was an error communicating with the AI. Please try again.", False
-
-#     if assistant_response:
-#         current_conversation.append({"role": "assistant", "content": assistant_response})
-
-#     conversation_history = messages + [{"role": "assistant", "content": assistant_response}]
-
-
-#     return assistant_response, CONTINUATION_EXIT_PHRASE in assistant_response
-
-
 async def chat_with_groq(user_input, image_path=None, current_iteration=None, max_iterations=None):
     global conversation_history, main_model_tokens
 
@@ -879,8 +738,7 @@ async def chat_with_groq(user_input, image_path=None, current_iteration=None, ma
             messages=messages_with_system,
             model=MAINMODEL,
             max_tokens=8000,
-            tools=tools,
-            tool_choice="auto"
+            tools=tools
         )
         console.print(Panel("Received response from Groq API", style="green"))
 
@@ -888,6 +746,7 @@ async def chat_with_groq(user_input, image_path=None, current_iteration=None, ma
             raise ValueError("Received empty response from Groq API")
 
         assistant_message = chat_completion.choices[0].message
+        
 
         if assistant_message is None:
             raise ValueError("Received empty message content from Groq API")
@@ -897,57 +756,72 @@ async def chat_with_groq(user_input, image_path=None, current_iteration=None, ma
         if assistant_response is None:
             raise ValueError("Received empty message content from Groq API")
 
+            
         if hasattr(chat_completion, 'usage'):
             usage = chat_completion.usage
             main_model_tokens['input'] += getattr(usage, 'prompt_tokens', 0)
             main_model_tokens['output'] += getattr(usage, 'completion_tokens', 0)
         else:
+            # Si no hay información de uso, hacemos una estimación basada en la longitud
             main_model_tokens['input'] += len(json.dumps(messages_with_system))
             main_model_tokens['output'] += len(assistant_response)
 
+
+        tool_calls = getattr(assistant_message, 'tool_calls', []) or []
+    
         console.print(Panel(Markdown(assistant_response), title="Groq's Response", title_align="left", border_style="blue", expand=False))
 
-        # Procesar herramientas iniciales
-        await process_tool_calls(assistant_response, current_conversation)
-
-        # Procesar herramientas adicionales basadas en la respuesta a las herramientas
-        max_tool_iterations = 5  # Prevenir bucles infinitos
-        for _ in range(max_tool_iterations):
-            try:
-                tool_response = groq_client.chat.completions.create(
-                    messages=conversation_history + current_conversation,
-                    model=TOOLCHECKERMODEL,
-                    max_tokens=8000,
-                    tools=tools
-                )
-                if hasattr(tool_response, 'usage'):
-                    tool_checker_tokens['input'] += getattr(tool_response.usage, 'prompt_tokens', 0)
-                    tool_checker_tokens['output'] += getattr(tool_response.usage, 'completion_tokens', 0)
-
-                tool_checker_response = tool_response.choices[0].message.content if tool_response.choices else None
-                if tool_checker_response:
-                    console.print(Panel(Markdown(tool_checker_response), title="Groq's Response to Tool Result", title_align="left", border_style="blue", expand=False))
-                    
-                    # Procesar herramientas adicionales
-                    new_tool_calls = await process_tool_calls(tool_checker_response, current_conversation)
-                    
-                    if not new_tool_calls:
-                        # Si no hay nuevas llamadas a herramientas, terminamos el ciclo
-                        assistant_response += "\n\n" + tool_checker_response
-                        break
-                else:
-                    break
-            except Exception as e:
-                error_message = f"Error in tool response: {str(e)}"
-                console.print(Panel(error_message, title="Error", style="bold red"))
-                assistant_response += f"\n\n{error_message}"
-                break
+        if tool_calls:
+            console.print(Panel("Tool calls detected", title="Tool Usage", style="bold yellow"))
+            console.print(Panel(json.dumps(tool_calls, indent=2), title="Tool Calls", style="cyan"))
 
         if file_contents:
             files_in_context = "\n".join(file_contents.keys())
         else:
             files_in_context = "No files in context. Read, create, or edit files to add."
         console.print(Panel(files_in_context, title="Files in Context", title_align="left", border_style="white", expand=False))
+
+        for tool_call in tool_calls:
+            tool_result = await execute_tool(tool_call)
+            
+            if tool_result["is_error"]:
+                console.print(Panel(tool_result["content"], title="Tool Execution Error", style="bold red"))
+            else:
+                console.print(Panel(tool_result["content"], title_align="left", title="Tool Result", style="green"))
+
+            current_conversation.append({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [tool_call]
+            })
+
+            current_conversation.append({
+                "role": "tool",
+                "content": tool_result["content"],
+                "tool_call_id": getattr(tool_call, 'id', 'unknown_id')
+            })
+
+        messages = conversation_history + current_conversation
+
+        try:
+            tool_response = groq_client.chat.completions.create(
+                messages=messages,
+                model=TOOLCHECKERMODEL,
+                max_tokens=8000,
+                tools=tools
+            )
+            if hasattr(tool_response, 'usage'):
+                tool_checker_tokens['input'] += getattr(tool_response.usage, 'prompt_tokens', 0)
+                tool_checker_tokens['output'] += getattr(tool_response.usage, 'completion_tokens', 0)
+
+            tool_checker_response = tool_response.choices[0].message.content if tool_response.choices else None
+            if tool_checker_response:
+                console.print(Panel(Markdown(tool_checker_response), title="Groq's Response to Tool Result",  title_align="left", border_style="blue", expand=False))
+                assistant_response += "\n\n" + tool_checker_response
+        except Exception as e:
+            error_message = f"Error in tool response: {str(e)}"
+            console.print(Panel(error_message, title="Error", style="bold red"))
+            assistant_response += f"\n\n{error_message}"
 
     except Exception as e:
         console.print(Panel(f"API Error: {str(e)}", title="API Error", style="bold red"))
@@ -956,9 +830,11 @@ async def chat_with_groq(user_input, image_path=None, current_iteration=None, ma
     if assistant_response:
         current_conversation.append({"role": "assistant", "content": assistant_response})
 
-    conversation_history = conversation_history + current_conversation
+    conversation_history = messages + [{"role": "assistant", "content": assistant_response}]
+
 
     return assistant_response, CONTINUATION_EXIT_PHRASE in assistant_response
+
 
 
 async def process_tool_calls(response_content, current_conversation):
