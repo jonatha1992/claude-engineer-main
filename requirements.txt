@@ -5,3 +5,6 @@ Pillow
 rich
 aiohttp
 prompt_toolkit
+rich 
+prompt_toolkit 
+groq
