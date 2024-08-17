@@ -701,112 +701,6 @@ async def send_to_ai_for_executing(code: str, execution_result: str) -> str:
 
 
 
-# async def chat_with_groq(user_input: str, current_iteration: Optional[int] = None, max_iterations: Optional[int] = None, max_retries: int = 3) -> Tuple[str, bool]:
-#     global conversation_history, token_counters
-
-#     current_conversation = [{"role": "user", "content": user_input}]
-#     messages = conversation_history + current_conversation
-
-#     # Inicializar assistant_response
-#     assistant_response = None
-
-#     for attempt in range(max_retries):
-#         try:
-#             system_message = {"role": "system", "content": update_system_prompt(current_iteration, max_iterations)}
-#             messages_with_system = [system_message] + messages
-
-#             console.print(Panel("Enviando solicitud a la API de Groq...", style="cyan"))
-#             chat_completion =  groq_client.chat.completions.create(
-#                 messages=messages_with_system,
-#                 model=MODEL,
-#                 max_tokens=8000,
-#                 tools=tools
-#             )
-#             console.print(Panel("Respuesta recibida de la API de Groq", style="green"))
-#             console.print(Panel("Respuesta chat_competion ", style="green"))
-#             console.print(chat_completion)
-
-#             if chat_completion is None or not hasattr(chat_completion, 'choices') or len(chat_completion.choices) == 0:
-#                 raise ValueError("Se recibió una respuesta vacía de la API de Groq")
-
-#             assistant_message = chat_completion.choices[0].message
-
-#             if assistant_message is None or assistant_message.content is None:
-#                 console.print(f"Intento {attempt + 1}/{max_retries} fallido: contenido de mensaje vacío. Reintentando...", style="bold yellow")
-#                 continue  # Retry if the message content is empty
-
-#             assistant_response = assistant_message.content
-
-#             # Mostrar la respuesta del asistente
-#             console.print(Panel(Markdown(assistant_response), title="Respuesta de Groq", title_align="left", border_style="blue", expand=False))
-#             tool_calls = getattr(assistant_message, 'tool_calls', []) or []
-
-
-#             if tool_calls:
-#                 console.print(Panel("Llamadas a herramientas detectadas", title="Uso de Herramientas", style="bold yellow"))
-#                 console.print(Panel(json.dumps(tool_calls, indent=2), title="Llamadas a Herramientas", style="cyan"))
-
-#             if file_contents:
-#                 files_in_context = "\n".join(file_contents.keys())
-#             else:
-#                 files_in_context = "No hay archivos en contexto. Lee, crea o edita archivos para añadir."
-#             console.print(Panel(files_in_context, title="Archivos en Contexto", title_align="left", border_style="white", expand=False))
-
-#             for tool_call in tool_calls:
-#                 tool_result = await execute_tool(tool_call)
-
-#                 if tool_result["is_error"]:
-#                     console.print(Panel(tool_result["content"], title="Error en la Ejecución de la Herramienta", style="bold red"))
-#                 else:
-#                     console.print(Panel(tool_result["content"], title_align="left", title="Resultado de la Herramienta", style="green"))
-
-#                 current_conversation.append({
-#                     "role": "assistant",
-#                     "content": None,
-#                     "tool_calls": [tool_call]
-#                 })
-
-#                 current_conversation.append({
-#                     "role": "tool",
-#                     "content": tool_result["content"],
-#                     "tool_call_id": getattr(tool_call, 'id', 'unknown_id')
-#                 })
-
-#             messages = conversation_history + current_conversation
-
-#             try:
-#                 tool_response = groq_client.chat.completions.create(
-#                     messages=messages,
-#                     model=MODEL,
-#                     max_tokens=8000,
-#                     tools=tools
-#                 )
-#                 if hasattr(tool_response, 'usage'):
-#                     token_counters['tool_checker']['input'] += getattr(tool_response.usage, 'prompt_tokens', 0)
-#                     token_counters['tool_checker']['output'] += getattr(tool_response.usage, 'completion_tokens', 0)
-
-#                 tool_checker_response = tool_response.choices[0].message.content if tool_response.choices else None
-#                 if tool_checker_response:
-#                     console.print(Panel(Markdown(tool_checker_response), title="Respuesta de Groq al Resultado de la Herramienta", title_align="left", border_style="blue", expand=False))
-#                     assistant_response += "\n\n" + tool_checker_response
-#             except Exception as e:
-#                 error_message = f"Error en la respuesta de la herramienta: {str(e)}"
-#                 console.print(Panel(error_message, title="Error", style="bold red"))
-#                 assistant_response += f"\n\n{error_message}"
-
-#             break  # Exit loop if successful
-
-#         except Exception as e:
-#             console.print(Panel(f"Error de API: {str(e)}", title="Error de API", style="bold red"))
-#             if attempt == max_retries - 1:
-#                 return "Lo siento, hubo un error al comunicarse con la IA. Por favor, intenta de nuevo.", False
-
-#     if assistant_response:
-#         current_conversation.append({"role": "assistant", "content": assistant_response})
-
-#     conversation_history = messages + [{"role": "assistant", "content": assistant_response}]
-
-#     return assistant_response, CONTINUATION_EXIT_PHRASE in assistant_response
 
 async def chat_with_groq(user_input: str, current_iteration: Optional[int] = None, max_iterations: Optional[int] = None, max_retries: int = 3) -> Tuple[str, bool]:
     global conversation_history, token_counters
@@ -837,7 +731,6 @@ async def chat_with_groq(user_input: str, current_iteration: Optional[int] = Non
                 raise ValueError("Se recibió una respuesta vacía de la API de Groq")
 
             assistant_message = chat_completion.choices[0].message
-
             if assistant_message is None or assistant_message.content is None:
                 console.print(f"Intento {attempt + 1}/{max_retries} fallido: contenido de mensaje vacío. Reintentando...", style="bold yellow")
                 continue  # Retry if the message content is empty
@@ -847,6 +740,7 @@ async def chat_with_groq(user_input: str, current_iteration: Optional[int] = Non
             # Mostrar la respuesta del asistente
             console.print(Panel(Markdown(assistant_response), title="Respuesta de Groq", title_align="left", border_style="blue", expand=False))
             tool_calls = getattr(assistant_message, 'tool_calls', []) or []
+    
 
             if tool_calls:
                 console.print(Panel("Llamadas a herramientas detectadas", title="Uso de Herramientas", style="bold yellow"))
@@ -915,6 +809,10 @@ async def chat_with_groq(user_input: str, current_iteration: Optional[int] = Non
     conversation_history = messages + [{"role": "assistant", "content": assistant_response}]
 
     return assistant_response, CONTINUATION_EXIT_PHRASE in assistant_response
+
+
+
+
 
 def reset_code_editor_memory():
     """Reinicia la memoria del editor de código."""
