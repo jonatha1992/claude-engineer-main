@@ -6,7 +6,7 @@ import logging
 import datetime
 import json
 import base64
-from typing import Optional, Dict, Any, Tuple, List
+from typing import Optional, Dict, Any, Tuple, List, Union
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
@@ -15,6 +15,7 @@ from rich.markdown import Markdown
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style
+import groq
 from groq import Groq
 import sys
 import signal
@@ -43,9 +44,7 @@ CONTINUATION_EXIT_PHRASE: str = "AUTOMODE_COMPLETE"
 exit_automode: bool = False
 
 # Modelos
-# MODEL: str = "llama-3.1-8b-instant"
 MODEL: str = "llama-3.1-70b-versatile"
-
 
 # Seguimiento de tokens
 token_counters: Dict[str, Dict[str, int]] = {
@@ -54,6 +53,7 @@ token_counters: Dict[str, Dict[str, int]] = {
     'code_editor': {'input': 0, 'output': 0},
     'code_execution': {'input': 0, 'output': 0}
 }
+
 
 # Prompts del sistema
 BASE_SYSTEM_PROMPT_ES: str = '''
@@ -590,63 +590,64 @@ def stop_process(process_id: str) -> str:
         return f"No se encontró un proceso en ejecución con ID {process_id}."
 
 
-async def execute_tool(tool_call: Dict[str, Any]) -> Dict[str, Any]:
-    """Ejecuta una herramienta basada en la llamada de herramienta."""
-    try:
-        function = tool_call.get('function', {})
-        function_name = function.get('name')
-        function_arguments = json.loads(function.get('arguments', '{}'))
+# async def execute_tool(tool_call: Dict[str, Any]) -> Dict[str, Any]:
+#     """Ejecuta una herramienta basada en la llamada de herramienta."""
+#     try:
+#         function = tool_call.get('function', {})
+#         function_name = function.get('name')
+#         function_arguments = json.loads(function.get('arguments', '{}'))
         
-        result = None
-        is_error = False
+#         result = None
+#         is_error = False
 
-        if function_name == "create_folder":
-            result = create_folder(function_arguments["path"])
-        elif function_name == "create_file":
-            result = create_file(function_arguments["path"], function_arguments.get("content", ""))
-        elif function_name == "edit_and_apply":
-            result = await edit_and_apply(
-                function_arguments["path"],
-                function_arguments["instructions"],
-                function_arguments["project_context"],
-                is_automode=automode
-            )
-        elif function_name == "read_file":
-            result = read_file(function_arguments["path"])
-        elif function_name == "read_multiple_files":
-            result = read_multiple_files(function_arguments["paths"])
-        elif function_name == "list_files":
-            result = list_files(function_arguments.get("path", "."))
-        elif function_name == "execute_code":
-            process_id, execution_result = await execute_code(function_arguments["code"])
-            analysis_task = asyncio.create_task(send_to_ai_for_executing(function_arguments["code"], execution_result))
-            analysis = await analysis_task
-            result = f"{execution_result}\n\nAnálisis:\n{analysis}"
-            if process_id in running_processes:
-                result += "\n\nNota: El proceso aún se está ejecutando en segundo plano."
-        elif function_name == "stop_process":
-            result = stop_process(function_arguments["process_id"])
-        else:
-            is_error = True
-            result = f"Herramienta desconocida: {function_name}"
+#         if function_name == "create_folder":
+#             result = create_folder(function_arguments["path"])
+#         elif function_name == "create_file":
+#             result = create_file(function_arguments["path"], function_arguments.get("content", ""))
+#         elif function_name == "edit_and_apply":
+#             result = await edit_and_apply(
+#                 function_arguments["path"],
+#                 function_arguments["instructions"],
+#                 function_arguments["project_context"],
+#                 is_automode=automode
+#             )
+#         elif function_name == "read_file":
+#             result = read_file(function_arguments["path"])
+#         elif function_name == "read_multiple_files":
+#             result = read_multiple_files(function_arguments["paths"])
+#         elif function_name == "list_files":
+#             result = list_files(function_arguments.get("path", "."))
+#         elif function_name == "execute_code":
+#             process_id, execution_result = await execute_code(function_arguments["code"])
+#             analysis_task = asyncio.create_task(send_to_ai_for_executing(function_arguments["code"], execution_result))
+#             analysis = await analysis_task
+#             result = f"{execution_result}\n\nAnálisis:\n{analysis}"
+#             if process_id in running_processes:
+#                 result += "\n\nNota: El proceso aún se está ejecutando en segundo plano."
+#         elif function_name == "stop_process":
+#             result = stop_process(function_arguments["process_id"])
+#         else:
+#             is_error = True
+#             result = f"Herramienta desconocida: {function_name}"
 
-        return {
-            "content": result,
-            "is_error": is_error
-        }
-    except KeyError as e:
-        logging.error(f"Falta el parámetro requerido {str(e)} para la herramienta {function_name}")
-        return {
-            "content": f"Error: Falta el parámetro requerido {str(e)} para la herramienta {function_name}",
-            "is_error": True
-        }
-    except Exception as e:
-        logging.error(f"Error al ejecutar la herramienta {function_name}: {str(e)}")
-        return {
-            "content": f"Error al ejecutar la herramienta {function_name}: {str(e)}",
-            "is_error": True
-        }
-        
+#         return {
+#             "content": result,
+#             "is_error": is_error
+#         }
+#     except KeyError as e:
+#         logging.error(f"Falta el parámetro requerido {str(e)} para la herramienta {function_name}")
+#         return {
+#             "content": f"Error: Falta el parámetro requerido {str(e)} para la herramienta {function_name}",
+#             "is_error": True
+#         }
+#     except Exception as e:
+#         logging.error(f"Error al ejecutar la herramienta {function_name}: {str(e)}")
+#         return {
+#             "content": f"Error al ejecutar la herramienta {function_name}: {str(e)}",
+#             "is_error": True
+#         }
+
+
 async def send_to_ai_for_executing(code: str, execution_result: str) -> str:
     """Envía el código y su resultado de ejecución al modelo de AI para análisis."""
     global token_counters
@@ -702,116 +703,238 @@ async def send_to_ai_for_executing(code: str, execution_result: str) -> str:
 
 
 
-async def chat_with_groq(user_input: str, current_iteration: Optional[int] = None, max_iterations: Optional[int] = None, max_retries: int = 3) -> Tuple[str, bool]:
-    global conversation_history, token_counters
+# async def chat_with_groq(user_input: str, current_iteration: Optional[int] = None, max_iterations: Optional[int] = None, max_retries: int = 3) -> Tuple[str, bool]:
+#     global conversation_history, token_counters
 
-    current_conversation = [{"role": "user", "content": user_input}]
-    messages = conversation_history + current_conversation
+#     current_conversation = [{"role": "user", "content": user_input}]
+#     messages = conversation_history + current_conversation
 
-    # Inicializar assistant_response como cadena vacía
-    assistant_response = ""
+#     # Inicializar assistant_response como cadena vacía
+#     assistant_response = ""
 
-    for attempt in range(max_retries):
-        try:
-            system_message = {"role": "system", "content": update_system_prompt(current_iteration, max_iterations)}
-            messages_with_system = [system_message] + messages
+#     for attempt in range(max_retries):
+#         try:
+#             system_message = {"role": "system", "content": update_system_prompt(current_iteration, max_iterations)}
+#             messages_with_system = [system_message] + messages
 
-            console.print(Panel("Enviando solicitud a la API de Groq...", style="cyan"))
-            chat_completion = groq_client.chat.completions.create(
-                messages=messages_with_system,
-                model=MODEL,
-                max_tokens=8000,
-                tools=tools
-            )
-            console.print(Panel("Respuesta recibida de la API de Groq", style="green"))
-            console.print(Panel("Respuesta chat_competion ", style="green"))
-            console.print(chat_completion)
+#             console.print(Panel("Enviando solicitud a la API de Groq...", style="cyan"))
+#             chat_completion = groq_client.chat.completions.create(
+#                 messages=messages_with_system,
+#                 model=MODEL,
+#                 max_tokens=8000,
+#                 tools=tools
+#             )
+#             console.print(Panel("Respuesta recibida de la API de Groq", style="green"))
+#             console.print(Panel("Respuesta chat_competion ", style="green"))
+#             console.print(chat_completion)
 
-            if chat_completion is None or not hasattr(chat_completion, 'choices') or len(chat_completion.choices) == 0:
-                raise ValueError("Se recibió una respuesta vacía de la API de Groq")
+#             if chat_completion is None or not hasattr(chat_completion, 'choices') or len(chat_completion.choices) == 0:
+#                 raise ValueError("Se recibió una respuesta vacía de la API de Groq")
 
-            assistant_message = chat_completion.choices[0].message
-            if assistant_message is None or assistant_message.content is None:
-                console.print(f"Intento {attempt + 1}/{max_retries} fallido: contenido de mensaje vacío. Reintentando...", style="bold yellow")
-                continue  # Retry if the message content is empty
+#             assistant_message = chat_completion.choices[0].message
+#             console.print("assistant_message",assistant_message)
+#             if assistant_message is None or assistant_message.content is None:
+#                 console.print(f"Intento {attempt + 1}/{max_retries} fallido: contenido de mensaje vacío. Reintentando...", style="bold yellow")
+#                 continue  # Retry if the message content is empty
 
-            assistant_response = assistant_message.content or ""
+#             assistant_response = assistant_message.content or ""
 
-            # Mostrar la respuesta del asistente
-            console.print(Panel(Markdown(assistant_response), title="Respuesta de Groq", title_align="left", border_style="blue", expand=False))
-            tool_calls = getattr(assistant_message, 'tool_calls', []) or []
+#             # Mostrar la respuesta del asistente
+#             console.print(Panel(Markdown(assistant_response), title="Respuesta de Groq", title_align="left", border_style="blue", expand=False))
+#             tool_calls = getattr(assistant_message, 'tool_calls', []) or []
     
 
-            if tool_calls:
-                console.print(Panel("Llamadas a herramientas detectadas", title="Uso de Herramientas", style="bold yellow"))
-                console.print(Panel(json.dumps(tool_calls, indent=2), title="Llamadas a Herramientas", style="cyan"))
+#             if tool_calls:
+#                 console.print(Panel("Llamadas a herramientas detectadas", title="Uso de Herramientas", style="bold yellow"))
+#                 console.print(Panel(json.dumps(tool_calls, indent=2), title="Llamadas a Herramientas", style="cyan"))
 
-            if file_contents:
-                files_in_context = "\n".join(file_contents.keys())
-            else:
-                files_in_context = "No hay archivos en contexto. Lee, crea o edita archivos para añadir."
-            console.print(Panel(files_in_context, title="Archivos en Contexto", title_align="left", border_style="white", expand=False))
+#             if file_contents:
+#                 files_in_context = "\n".join(file_contents.keys())
+#             else:
+#                 files_in_context = "No hay archivos en contexto. Lee, crea o edita archivos para añadir."
+#             console.print(Panel(files_in_context, title="Archivos en Contexto", title_align="left", border_style="white", expand=False))
 
-            for tool_call in tool_calls:
-                tool_result = await execute_tool(tool_call)
+#             for tool_call in tool_calls:
+#                 tool_result = await execute_tool(tool_call)
 
-                if tool_result["is_error"]:
-                    console.print(Panel(tool_result["content"], title="Error en la Ejecución de la Herramienta", style="bold red"))
-                else:
-                    console.print(Panel(tool_result["content"], title_align="left", title="Resultado de la Herramienta", style="green"))
+#                 if tool_result["is_error"]:
+#                     console.print(Panel(tool_result["content"], title="Error en la Ejecución de la Herramienta", style="bold red"))
+#                 else:
+#                     console.print(Panel(tool_result["content"], title_align="left", title="Resultado de la Herramienta", style="green"))
 
-                current_conversation.append({
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [tool_call]
-                })
+#                 current_conversation.append({
+#                     "role": "assistant",
+#                     "content": None,
+#                     "tool_calls": [tool_call]
+#                 })
 
-                current_conversation.append({
-                    "role": "tool",
-                    "content": tool_result["content"],
-                    "tool_call_id": getattr(tool_call, 'id', 'unknown_id')
-                })
+#                 current_conversation.append({
+#                     "role": "tool",
+#                     "content": tool_result["content"],
+#                     "tool_call_id": getattr(tool_call, 'id', 'unknown_id')
+#                 })
 
-            messages = conversation_history + current_conversation
+#             messages = conversation_history + current_conversation
 
-            try:
-                tool_response = groq_client.chat.completions.create(
-                    messages=messages,
-                    model=MODEL,
-                    max_tokens=8000,
-                    tools=tools
-                )
-                if hasattr(tool_response, 'usage'):
-                    token_counters['tool_checker']['input'] += getattr(tool_response.usage, 'prompt_tokens', 0)
-                    token_counters['tool_checker']['output'] += getattr(tool_response.usage, 'completion_tokens', 0)
+#             try:
+#                 tool_response = groq_client.chat.completions.create(
+#                     messages=messages,
+#                     model=MODEL,
+#                     max_tokens=8000,
+#                     tools=tools
+#                 )
+#                 if hasattr(tool_response, 'usage'):
+#                     token_counters['tool_checker']['input'] += getattr(tool_response.usage, 'prompt_tokens', 0)
+#                     token_counters['tool_checker']['output'] += getattr(tool_response.usage, 'completion_tokens', 0)
 
-                tool_checker_response = tool_response.choices[0].message.content if tool_response.choices else None
-                if tool_checker_response:
-                    console.print(Panel(Markdown(tool_checker_response), title="Respuesta de Groq al Resultado de la Herramienta", title_align="left", border_style="blue", expand=False))
-                    assistant_response += "\n\n" + tool_checker_response
-            except Exception as e:
-                error_message = f"Error en la respuesta de la herramienta: {str(e)}"
-                console.print(Panel(error_message, title="Error", style="bold red"))
-                assistant_response += f"\n\n{error_message}"
+#                 tool_checker_response = tool_response.choices[0].message.content if tool_response.choices else None
+#                 if tool_checker_response:
+#                     console.print(Panel(Markdown(tool_checker_response), title="Respuesta de Groq al Resultado de la Herramienta", title_align="left", border_style="blue", expand=False))
+#                     assistant_response += "\n\n" + tool_checker_response
+#             except Exception as e:
+#                 error_message = f"Error en la respuesta de la herramienta: {str(e)}"
+#                 console.print(Panel(error_message, title="Error", style="bold red"))
+#                 assistant_response += f"\n\n{error_message}"
 
-            break  # Exit loop if successful
+#             break  # Exit loop if successful
 
-        except Exception as e:
-            console.print(Panel(f"Error de API: {str(e)}", title="Error de API", style="bold red"))
-            if attempt == max_retries - 1:
-                return "Lo siento, hubo un error al comunicarse con la IA. Por favor, intenta de nuevo.", False
+#         except Exception as e:
+#             console.print(Panel(f"Error de API: {str(e)}", title="Error de API", style="bold red"))
+#             if attempt == max_retries - 1:
+#                 return "Lo siento, hubo un error al comunicarse con la IA. Por favor, intenta de nuevo.", False
 
-    if assistant_response is None:
-        assistant_response = ""
+#     if assistant_response is None:
+#         assistant_response = ""
 
-    current_conversation.append({"role": "assistant", "content": assistant_response})
+#     current_conversation.append({"role": "assistant", "content": assistant_response})
 
-    conversation_history = messages + [{"role": "assistant", "content": assistant_response}]
+#     conversation_history = messages + [{"role": "assistant", "content": assistant_response}]
 
-    return assistant_response, CONTINUATION_EXIT_PHRASE in assistant_response
+#     return assistant_response, CONTINUATION_EXIT_PHRASE in assistant_response
+
+
+# async def chat_with_groq(user_input: str, current_iteration: Optional[int] = None, max_iterations: Optional[int] = None, max_retries: int = 3) -> Tuple[str, bool]:
+#     global conversation_history, token_counters
+
+#     current_conversation = [{"role": "user", "content": user_input}]
+#     messages = conversation_history + current_conversation
+
+#     assistant_response = ""
+
+#     for attempt in range(max_retries):
+#         try:
+#             system_message = {"role": "system", "content": update_system_prompt(current_iteration, max_iterations)}
+#             messages_with_system = [system_message] + messages
+
+#             console.print(Panel("Enviando solicitud a la API de Groq...", style="cyan"))
+#             chat_completion = groq_client.chat.completions.create(
+#                 messages=messages_with_system,
+#                 model=MODEL,
+#                 max_tokens=8000,
+#                 tools=tools
+#             )
+#             console.print(Panel("Respuesta recibida de la API de Groq", style="green"))
+#             console.print(Panel("Respuesta chat_completion ", style="green"))
+#             console.print(chat_completion)
+
+#             if chat_completion is None or not hasattr(chat_completion, 'choices') or len(chat_completion.choices) == 0:
+#                 raise ValueError("Se recibió una respuesta vacía de la API de Groq")
+
+#             assistant_message = chat_completion.choices[0].message
+#             console.print("assistant_message", assistant_message)
+            
+#             # Manejar casos donde hay tool_calls pero no hay contenido
+#             if assistant_message.content is None and assistant_message.tool_calls:
+#                 tool_calls = assistant_message.tool_calls
+#                 assistant_response = "Se detectaron llamadas a herramientas:"
+#                 for tool_call in tool_calls:
+#                     assistant_response += f"\n- {tool_call.function.name}: {tool_call.function.arguments}"
+#             elif assistant_message.content is None:
+#                 console.print(f"Intento {attempt + 1}/{max_retries} fallido: contenido de mensaje vacío y sin tool_calls. Reintentando...", style="bold yellow")
+#                 continue
+#             else:
+#                 assistant_response = assistant_message.content
+
+#             # Mostrar la respuesta del asistente
+#             console.print(Panel(Markdown(assistant_response), title="Respuesta de Groq", title_align="left", border_style="blue", expand=False))
+            
+#             # Procesar tool_calls
+#             tool_calls = assistant_message.tool_calls or []
+#             if tool_calls:
+#                 console.print(Panel("Llamadas a herramientas detectadas", title="Uso de Herramientas", style="bold yellow"))
+#                 console.print(Panel(json.dumps(tool_calls, indent=2, default=str), title="Llamadas a Herramientas", style="cyan"))
+
+#                 for tool_call in tool_calls:
+#                     tool_result = await execute_tool(tool_call)
+
+#                     if tool_result["is_error"]:
+#                         console.print(Panel(tool_result["content"], title="Error en la Ejecución de la Herramienta", style="bold red"))
+#                     else:
+#                         console.print(Panel(tool_result["content"], title_align="left", title="Resultado de la Herramienta", style="green"))
+
+#                     current_conversation.append({
+#                         "role": "assistant",
+#                         "content": None,
+#                         "tool_calls": [tool_call]
+#                     })
+
+#                     current_conversation.append({
+#                         "role": "tool",
+#                         "content": tool_result["content"],
+#                         "tool_call_id": tool_call.id
+#                     })
+
+#             messages = conversation_history + current_conversation
+
+#             try:
+#                 tool_response = groq_client.chat.completions.create(
+#                     messages=messages,
+#                     model=MODEL,
+#                     max_tokens=8000,
+#                     tools=tools
+#                 )
+#                 if hasattr(tool_response, 'usage'):
+#                     token_counters['tool_checker']['input'] += getattr(tool_response.usage, 'prompt_tokens', 0)
+#                     token_counters['tool_checker']['output'] += getattr(tool_response.usage, 'completion_tokens', 0)
+
+#                 tool_checker_response = tool_response.choices[0].message.content if tool_response.choices else None
+#                 if tool_checker_response:
+#                     console.print(Panel(Markdown(tool_checker_response), title="Respuesta de Groq al Resultado de la Herramienta", title_align="left", border_style="blue", expand=False))
+#                     assistant_response += "\n\n" + tool_checker_response
+#             except Exception as e:
+#                 error_message = f"Error en la respuesta de la herramienta: {str(e)}"
+#                 console.print(Panel(error_message, title="Error", style="bold red"))
+#                 assistant_response += f"\n\n{error_message}"
+
+#             break  # Exit loop if successful
+
+#         except Exception as e:
+#             console.print(Panel(f"Error de API: {str(e)}", title="Error de API", style="bold red"))
+#             if attempt == max_retries - 1:
+#                 return "Lo siento, hubo un error al comunicarse con la IA. Por favor, intenta de nuevo.", False
+
+#     conversation_history = messages + [{"role": "assistant", "content": assistant_response}]
+
+#     return assistant_response, CONTINUATION_EXIT_PHRASE in assistant_response
 
 
 
+def extract_tool_calls(content: str) -> List[Dict[str, Any]]:
+    tool_calls = []
+    tool_pattern = r'`([a-zA-Z_]+)\s+([^`]+)`'
+    matches = re.findall(tool_pattern, content)
+    
+    for i, (tool_name, args) in enumerate(matches):
+        tool_calls.append({
+            "id": f"call_{i}",
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "arguments": args.strip()
+            }
+        })
+    
+    return tool_calls
 
 
 def reset_code_editor_memory():
@@ -860,6 +983,159 @@ def save_chat():
         f.write(formatted_chat)
     
     return filename
+
+async def chat_with_groq(user_input: str, current_iteration: Optional[int] = None, max_iterations: Optional[int] = None, max_retries: int = 3) -> Tuple[str, bool]:
+    global conversation_history, token_counters
+
+    current_conversation = [{"role": "user", "content": user_input}]
+    messages = conversation_history + current_conversation
+
+    assistant_response = ""
+
+    for attempt in range(max_retries):
+        try:
+            system_message = {"role": "system", "content": update_system_prompt(current_iteration, max_iterations)}
+            messages_with_system = [system_message] + messages
+
+            console.print(Panel("Enviando solicitud a la API de Groq...", style="cyan"))
+            chat_completion = groq_client.chat.completions.create(
+                messages=messages_with_system,
+                model=MODEL,
+                max_tokens=8000,
+                tools=tools
+            )
+            console.print(Panel("Respuesta recibida de la API de Groq", style="green"))
+            console.print(Panel("Respuesta chat_completion ", style="green"))
+            console.print(chat_completion)
+
+            if not chat_completion or not chat_completion.choices:
+                raise ValueError("Se recibió una respuesta vacía de la API de Groq")
+
+            assistant_message = chat_completion.choices[0].message
+            console.print("assistant_message", assistant_message)
+            
+            if assistant_message.content:
+                assistant_response = assistant_message.content
+            elif assistant_message.tool_calls:
+                assistant_response = "Se detectaron llamadas a herramientas:"
+                for tool_call in assistant_message.tool_calls:
+                    assistant_response += f"\n- {tool_call.function.name}: {tool_call.function.arguments}"
+            else:
+                console.print(f"Intento {attempt + 1}/{max_retries} fallido: respuesta vacía. Reintentando...", style="bold yellow")
+                continue
+
+            # Mostrar la respuesta del asistente
+            console.print(Panel(Markdown(assistant_response), title="Respuesta de Groq", title_align="left", border_style="blue", expand=False))
+            
+            # Procesar tool_calls
+            if assistant_message.tool_calls:
+                console.print(Panel("Llamadas a herramientas detectadas", title="Uso de Herramientas", style="bold yellow"))
+                console.print(Panel(json.dumps([tc.model_dump() for tc in assistant_message.tool_calls], indent=2), title="Llamadas a Herramientas", style="cyan"))
+
+                for tool_call in assistant_message.tool_calls:
+                    tool_result = await execute_tool(tool_call)
+
+                    if tool_result["is_error"]:
+                        console.print(Panel(tool_result["content"], title="Error en la Ejecución de la Herramienta", style="bold red"))
+                    else:
+                        console.print(Panel(tool_result["content"], title_align="left", title="Resultado de la Herramienta", style="green"))
+
+                    current_conversation.append({
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [tool_call.model_dump()]
+                    })
+
+                    current_conversation.append({
+                        "role": "tool",
+                        "content": tool_result["content"],
+                        "tool_call_id": tool_call.id
+                    })
+
+            messages = conversation_history + current_conversation
+
+            try:
+                tool_response = groq_client.chat.completions.create(
+                    messages=messages,
+                    model=MODEL,
+                    max_tokens=8000,
+                    tools=tools
+                )
+                if hasattr(tool_response, 'usage'):
+                    token_counters['tool_checker']['input'] += getattr(tool_response.usage, 'prompt_tokens', 0)
+                    token_counters['tool_checker']['output'] += getattr(tool_response.usage, 'completion_tokens', 0)
+
+                tool_checker_response = tool_response.choices[0].message.content if tool_response.choices else None
+                if tool_checker_response:
+                    console.print(Panel(Markdown(tool_checker_response), title="Respuesta de Groq al Resultado de la Herramienta", title_align="left", border_style="blue", expand=False))
+                    assistant_response += "\n\n" + tool_checker_response
+            except Exception as e:
+                error_message = f"Error en la respuesta de la herramienta: {str(e)}"
+                console.print(Panel(error_message, title="Error", style="bold red"))
+                assistant_response += f"\n\n{error_message}"
+
+            break  # Exit loop if successful
+
+        except Exception as e:
+            console.print(Panel(f"Error de API: {str(e)}", title="Error de API", style="bold red"))
+            if attempt == max_retries - 1:
+                return "Lo siento, hubo un error al comunicarse con la IA. Por favor, intenta de nuevo.", False
+
+    conversation_history = messages + [{"role": "assistant", "content": assistant_response}]
+
+    return assistant_response, CONTINUATION_EXIT_PHRASE in assistant_response
+
+async def execute_tool(tool_call: Any) -> Dict[str, Any]:
+    """Ejecuta una herramienta basada en la llamada de herramienta."""
+    try:
+        function_name = tool_call.function.name
+        function_arguments = json.loads(tool_call.function.arguments)
+        
+        result = None
+        is_error = False
+
+        if function_name == "create_folder":
+            result = create_folder(function_arguments["path"])
+        elif function_name == "create_file":
+            result = create_file(function_arguments["path"], function_arguments.get("content", ""))
+        elif function_name == "edit_and_apply":
+            result = await edit_and_apply(
+                function_arguments["path"],
+                function_arguments["instructions"],
+                function_arguments["project_context"],
+                is_automode=automode
+            )
+        elif function_name == "read_file":
+            result = read_file(function_arguments["path"])
+        elif function_name == "read_multiple_files":
+            result = read_multiple_files(function_arguments["paths"])
+        elif function_name == "list_files":
+            result = list_files(function_arguments.get("path", "."))
+        elif function_name == "execute_code":
+            process_id, execution_result = await execute_code(function_arguments["code"])
+            analysis_task = asyncio.create_task(send_to_ai_for_executing(function_arguments["code"], execution_result))
+            analysis = await analysis_task
+            result = f"{execution_result}\n\nAnálisis:\n{analysis}"
+            if process_id in running_processes:
+                result += "\n\nNota: El proceso aún se está ejecutando en segundo plano."
+        elif function_name == "stop_process":
+            result = stop_process(function_arguments["process_id"])
+        else:
+            is_error = True
+            result = f"Herramienta desconocida: {function_name}"
+
+        return {
+            "content": result,
+            "is_error": is_error
+        }
+    except Exception as e:
+        logging.error(f"Error al ejecutar la herramienta: {str(e)}")
+        return {
+            "content": f"Error al ejecutar la herramienta: {str(e)}",
+            "is_error": True
+        }
+
+
 
 async def main():
     """Función principal que maneja la interacción con el usuario."""
