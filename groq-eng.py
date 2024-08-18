@@ -985,5 +985,3 @@ if __name__ == "__main__":
         logging.error(f"Error inesperado: {str(e)}")
 
 
-# if __name__ == "__main__":
-#     asyncio.run(main())
